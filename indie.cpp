@@ -1,75 +1,116 @@
-// indie2.cpp : Этот файл содержит функцию "main". Здесь начинается и заканчивается выполнение программы.
-//
-
 #include <iostream>
+#include <sstream>
+#include <type_traits>
 
-#define DEFINE_OPERATOR_S32LL(_OP, S32LLBTYPE, S32LLBPATH) \
-__s32ll operator _OP (__s32ll s32lla, S32LLBTYPE s32llb) \
+#define S32LL_INTERNAL_OPERATOR(S32LL_OPERATOR) \
+template <typename _Type>\
+__s32ll& operator S32LL_OPERATOR (_Type value) \
 { \
-    return __s32ll(s32lla.float_value _OP S32LLBPATH); \
+    if constexpr (std::is_same_v<_Type, __s32ll>)\
+        float_value S32LL_OPERATOR value.float_value;\
+    else if constexpr (std::is_same_v<_Type, uint32_t> || std::is_same_v<_Type, int32_t> || std::is_same_v<_Type, unsigned long long int>) \
+        u32_value S32LL_OPERATOR value;\
+    else\
+        float_value S32LL_OPERATOR value;\
+    return *this;\
 } \
 
-// unsigned int 32 bit
-using __u32 = uint32_t;
-
-// unsigned int 16 bit
-using __u16 = uint16_t;
-
-// unsigned int 8 bit
-using __u8 = uint8_t;
+#define S32LL_EXTERNAL_OPERATOR(S32LL_OPERATOR) \
+template <typename _Type1, typename _Type2>\
+__s32ll operator S32LL_OPERATOR (_Type1 value1, _Type2 value2)\
+{\
+    static_assert(\
+        std::is_same_v<_Type1, __s32ll> || std::is_same_v<_Type2, __s32ll>,\
+        "One of arguments must be __s32ll"\
+        );\
+    __s32ll s32ll_ret;\
+    s32ll_ret = __s32ll(value1).float_value S32LL_OPERATOR __s32ll(value2).float_value;\
+    return s32ll_ret;\
+}
 
 // mask for getting a bit at the end of a 32 bit number
-constexpr __u32 u32_mask = static_cast<__u32>(0b1u);
+constexpr uint32_t u32_mask = static_cast<uint32_t>(0b1u);
 
-// IEEE754 single precision floating point 32 bit low-level -> struct (size = 32 bit)
+// IEEE754 single precision floating point 32 bit
 // si - sign bit - 1 bit
 // ex - exponent - 8 bit
 // ma - mantissa - 23 bit
 struct __s32p
 {
-    __u32 ma : 23;
-    __u32 ex : 8;
-    __u32 si : 1;
+    uint32_t ma : 23;
+    uint32_t ex : 8;
+    uint32_t si : 1;
 };
 
-// single precision floating point 32 bit low-level -> union (size = 32 bit)
-union __s32ll 
+
+// union-impl 32 bit 
+union __s32ll
 {
     __s32p s32p;
     float float_value;
-    __u32 u32_value;
-    __s32ll(float src) : float_value(src) {}
-    __s32ll(__u32 src) : u32_value(src) {}
-    __s32ll& operator= (float src) 
+    uint32_t u32_value;
+
+    __s32ll() : float_value(0.0f) {}
+
+    template <typename _Type>
+    __s32ll(const __s32ll& value) : float_value(value.float_value) {}
+
+    template <typename _Type>
+    __s32ll(typename _Type value)
     {
-        float_value = src;
+        if constexpr (std::is_same_v<_Type, uint32_t> || std::is_same_v<_Type, int32_t> || std::is_same_v<_Type, unsigned long long int>)
+            u32_value = static_cast<uint32_t>(value);
+        else
+            float_value = static_cast<float>(value);
     }
-    __s32ll& operator=(__u32 src)
+
+    template <typename _Type>
+    operator _Type ()
     {
-        u32_value = src;
-    }
+        if constexpr (std::is_same_v<_Type, __s32ll>)
+			return *this;
+        else if constexpr (std::is_same_v<_Type, uint32_t> || std::is_same_v<_Type, int32_t> || std::is_same_v<_Type, unsigned long long int>)
+            return static_cast<_Type>(u32_value);
+        else 
+            return static_cast<_Type>(float_value);
+    } 
+
+	S32LL_INTERNAL_OPERATOR(=)
+	S32LL_INTERNAL_OPERATOR(+=)
+	S32LL_INTERNAL_OPERATOR(-=)
+	S32LL_INTERNAL_OPERATOR(*=)
+	S32LL_INTERNAL_OPERATOR(/=)
 };
 
-DEFINE_OPERATOR_S32LL(+, __s32ll, s32llb.float_value)
-DEFINE_OPERATOR_S32LL(-, __s32ll, s32llb.float_value)
-DEFINE_OPERATOR_S32LL(*, __s32ll, s32llb.float_value)
-DEFINE_OPERATOR_S32LL(/, __s32ll, s32llb.float_value)
-
-DEFINE_OPERATOR_S32LL(+, float, s32llb)
-DEFINE_OPERATOR_S32LL(-, float, s32llb)
-DEFINE_OPERATOR_S32LL(*, float, s32llb)
-DEFINE_OPERATOR_S32LL(/, float, s32llb)
-
+S32LL_EXTERNAL_OPERATOR(+)
+S32LL_EXTERNAL_OPERATOR(-)
+S32LL_EXTERNAL_OPERATOR(/)
+S32LL_EXTERNAL_OPERATOR(*)
 
 __s32ll operator-(__s32ll s32lla)
 {
     return __s32ll(-s32lla.float_value);
 }
 
-inline std::string to_string(__u32 u32, __u8 end, __u8 begin = __u8(0))
+__s32ll operator+(__s32ll s32lla)
+{
+    return __s32ll(+s32lla.float_value);
+}
+
+__s32ll operator"" _s32ll(long double value)
+{
+    return __s32ll(value);
+}
+
+__s32ll operator"" _s32ll(unsigned long long int value)
+{
+    return __s32ll(value);
+}
+
+inline std::string to_string(uint32_t u32, uint8_t end, uint8_t begin = uint8_t(0))
 {
     std::string str;
-    
+
     for (int i = end - 1; i >= begin; i--)
         str += (u32_mask & (u32 >> i)) >= 1 ? '1' : '0';
     return str;
@@ -90,28 +131,14 @@ inline std::ostream& operator<<(std::ostream& os, __s32ll s32ll)
     return os << to_string(s32ll.s32p);
 }
 
-inline void get_info(__s32ll s32ll)
+inline std::string get_info(__s32ll s32ll)
 {
-    std::cout << "1) " << s32ll.float_value << "f = " << s32ll << '\n';
+	std::stringstream ss;
+    ss << "1) " << s32ll.float_value << "f = " << s32ll << '\n';
     if (s32ll.s32p.si == 1)
-        std::cout << "2) Is a negative number\n";
+        ss << "2) Is a negative number\n";
     else
-        std::cout << "2) Is a positive number\n";
-    std::cout << "3) Exponent = " << s32ll.s32p.ex << '\n';
-}
-
-int main()
-{
-    //__s32ll a = 0b1'01111110'10111111000001111100000;
-    __s32ll a = 1.5f;
-    __s32ll b = -5.0f;
-    __s32ll a_add_b = a + 1.5f;
-
-    get_info(a);
-    std::cout << std::endl;
-    get_info(-b);
-    std::cout << std::endl;
-    get_info(b);
-    std::cout << std::endl;
-    get_info(a_add_b);
+        ss << "2) Is a positive number\n";
+    ss << "3) Exponent = " << s32ll.s32p.ex << '\n';
+	return ss.str();
 }

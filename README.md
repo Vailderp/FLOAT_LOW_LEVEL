@@ -34,7 +34,7 @@ int main()
 // 3) Exponent = 129
 ```
 
-#Example 3. Тернарные ооператоры
+#Example 3. Тернарные операторы
 ```cpp
 int main()
 {
